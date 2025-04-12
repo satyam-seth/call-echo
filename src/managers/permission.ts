@@ -1,3 +1,4 @@
+// https://developer.mozilla.org/en-US/docs/Web/API/Permissions_API
 export class PermissionManager {
     // Query the current permission status (granted, denied, prompt)
     static async queryPermissionStatus(permissionName: PermissionName): Promise<PermissionState | null> {
