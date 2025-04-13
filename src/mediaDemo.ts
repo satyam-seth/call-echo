@@ -5,7 +5,7 @@ function getButton(innerText: string, id: string, onClick: (e: MouseEvent) => Pr
     button.id = id;
     button.disabled = disabled;
     button.innerText = innerText;
-    button.addEventListener('click', onClick)
+    button.addEventListener('click', onClick);
     return button;
 }
 
@@ -266,6 +266,10 @@ function getLocalStreamAudioButton(): HTMLButtonElement {
 export function getMediaContainer() {
     const container = document.createElement('div');
     container.className = 'media-container';
+
+    const heading = document.createElement('h2');
+    heading.innerText = 'Media Demo';
+    container.appendChild(heading);
 
     container.appendChild(getLocalStreamVideoButton());
     container.appendChild(getLocalStreamAudioButton());

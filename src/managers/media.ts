@@ -95,7 +95,7 @@ export class MediaManager {
 
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
-            this.audioInputDevices = devices.filter(device => device.kind === "audioinput")
+            this.audioInputDevices = devices.filter(device => device.kind === "audioinput");
             this.videoInputDevices = devices.filter(device => device.kind === "videoinput");
             this.audioOutputDevices = devices.filter(device => device.kind === "audiooutput");
             return devices;
