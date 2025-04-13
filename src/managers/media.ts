@@ -3,6 +3,10 @@ export class MediaManager {
 
     private mediaStream: MediaStream | null = null;
 
+    private audioInputDevices: MediaDeviceInfo[] = [];
+    private audioOutputDevices: MediaDeviceInfo[] = [];
+    private videoInputDevices: MediaDeviceInfo[] = [];
+
     private constructor() { }
 
     public static get instance(): MediaManager {
@@ -73,4 +77,38 @@ export class MediaManager {
     getMediaStream(): MediaStream | null {
         return this.mediaStream;
     }
+
+    // Enumerate devices (input and output)
+    async enumerateDevices(): Promise<MediaDeviceInfo[] | undefined> {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            throw new Error('enumerateDevices is not supported in this browser.');
+        }
+
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.audioInputDevices = devices.filter(device => device.kind === "audioinput")
+            this.videoInputDevices = devices.filter(device => device.kind === "videoinput");
+            this.audioOutputDevices = devices.filter(device => device.kind === "audiooutput");
+            return devices;
+        } catch (err) {
+            console.error("Error enumerating devices:", err);
+            throw err;
+        }
+    }
+
+    // Get audio input devices
+    getAudioInputDevices(): MediaDeviceInfo[] {
+        return this.audioInputDevices;
+    }
+
+    // Get audio output devices
+    getAudioOutputDevices(): MediaDeviceInfo[] {
+        return this.audioOutputDevices;
+    }
+
+    // Get video input devices
+    getVideoInputDevices(): MediaDeviceInfo[] {
+        return this.videoInputDevices;
+    }
+
 }
