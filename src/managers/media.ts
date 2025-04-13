@@ -7,6 +7,8 @@ export class MediaManager {
     private audioOutputDevices: MediaDeviceInfo[] = [];
     private videoInputDevices: MediaDeviceInfo[] = [];
 
+    private constraints?: MediaStreamConstraints;
+
     private constructor() { }
 
     public static get instance(): MediaManager {
@@ -16,7 +18,7 @@ export class MediaManager {
         return MediaManager._instance;
     }
 
-    async getUserMedia(options: MediaStreamConstraints): Promise<MediaStream> {
+    async getUserMedia(options?: MediaStreamConstraints): Promise<MediaStream> {
         try {
             // Check if the browser supports getUserMedia
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -26,7 +28,8 @@ export class MediaManager {
             // Stop any existing tracks before starting a new one
             this.stopMediaStream();
 
-            this.mediaStream = await navigator.mediaDevices.getUserMedia(options);
+            this.constraints = options;
+            this.mediaStream = await navigator.mediaDevices.getUserMedia(this.constraints);
             return this.mediaStream;
         }
         catch (error) {
@@ -111,4 +114,15 @@ export class MediaManager {
         return this.videoInputDevices;
     }
 
+    // Set input device for audio
+    async setAudioInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<void> {
+        const constraints: MediaStreamConstraints = { ...this.constraints, audio: { deviceId: { exact: deviceId } } };
+
+        try {
+            const stream = await this.getUserMedia(constraints);
+            onStream(stream);
+        } catch (error) {
+            console.error('Error setting audio input device:', error);
+        }
+    }
 }
