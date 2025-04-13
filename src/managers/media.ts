@@ -114,15 +114,42 @@ export class MediaManager {
         return this.videoInputDevices;
     }
 
-    // Set input device for audio
-    async setAudioInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<void> {
-        const constraints: MediaStreamConstraints = { ...this.constraints, audio: { deviceId: { exact: deviceId } } };
+    // Set input device
+    async UpdateDevice(constraints: MediaStreamConstraints, onStream: (stream: MediaStream) => void): Promise<void> {
+        // check if previous stream is null or not and any track is disabled then we have to disable the track in new stream
+        let audioTrackEnabled = true;
+        let videoTrackEnabled = true;
+        if (this.mediaStream) {
+            audioTrackEnabled = this.isTrackEnabled('audio');
+            videoTrackEnabled = this.isTrackEnabled('video');
+        }
 
         try {
             const stream = await this.getUserMedia(constraints);
+
+            // Disable the tracks based on the previous stream state, by default all tracks are enabled
+            if (!audioTrackEnabled) {
+                this.disableTrack('audio');
+            }
+            if (!videoTrackEnabled) {
+                this.disableTrack('video');
+            }
+
             onStream(stream);
         } catch (error) {
             console.error('Error setting audio input device:', error);
         }
+    }
+
+    // Set input device for audio
+    async setAudioInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<void> {
+        const constraints: MediaStreamConstraints = { ...this.constraints, audio: { deviceId: { exact: deviceId } } };
+        await this.UpdateDevice(constraints, onStream);
+    }
+
+    // Set input device for video
+    async setVideoInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<void> {
+        const constraints: MediaStreamConstraints = { ...this.constraints, video: { deviceId: { exact: deviceId } } };
+        await this.UpdateDevice(constraints, onStream);
     }
 }
