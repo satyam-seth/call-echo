@@ -81,6 +81,11 @@ export class MediaManager {
         return this.mediaStream;
     }
 
+    // Get the current media stream constraints
+    getMediaStreamConstraints(): MediaStreamConstraints | undefined {
+        return this.constraints;
+    }
+
     // Enumerate devices (input and output)
     async enumerateDevices(): Promise<MediaDeviceInfo[] | undefined> {
         if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
@@ -115,7 +120,7 @@ export class MediaManager {
     }
 
     // Set input device
-    async UpdateDevice(constraints: MediaStreamConstraints, onStream: (stream: MediaStream) => void): Promise<void> {
+    async setInputDevice(constraints: MediaStreamConstraints, onStream: (stream: MediaStream) => void): Promise<void> {
         // check if previous stream is null or not and any track is disabled then we have to disable the track in new stream
         let audioTrackEnabled = true;
         let videoTrackEnabled = true;
@@ -137,19 +142,51 @@ export class MediaManager {
 
             onStream(stream);
         } catch (error) {
-            console.error('Error setting audio input device:', error);
+            console.error('Error setting update input device:', error);
         }
     }
 
     // Set input device for audio
-    async setAudioInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<void> {
+    async setAudioInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<boolean> {
         const constraints: MediaStreamConstraints = { ...this.constraints, audio: { deviceId: { exact: deviceId } } };
-        await this.UpdateDevice(constraints, onStream);
+        try {
+            await this.setInputDevice(constraints, onStream);
+            return true;
+        } catch (error) {
+            console.error('Error setting audio input device:', error);
+            return false;
+        }
     }
 
     // Set input device for video
-    async setVideoInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<void> {
+    async setVideoInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<boolean> {
         const constraints: MediaStreamConstraints = { ...this.constraints, video: { deviceId: { exact: deviceId } } };
-        await this.UpdateDevice(constraints, onStream);
+        try {
+            await this.setInputDevice(constraints, onStream);
+            return true;
+        } catch (error) {
+            console.error('Error setting video input device:', error);
+            return false;
+        }
+    }
+
+    async setAudioOutputDevice(element: HTMLAudioElement | HTMLVideoElement, deviceId: string): Promise<boolean> {
+        if (typeof element.sinkId !== 'undefined') {
+            try {
+                await element.setSinkId(deviceId);
+            } catch (error: any) {
+
+                let errorMessage = error;
+                if (error.name === 'SecurityError') {
+                    errorMessage = `You need to use HTTPS for selecting audio output device: ${error}`;
+                }
+                console.error(errorMessage);
+            }
+
+            return true;
+        } else {
+            console.warn('Browser does not support output device selection.');
+            return false;
+        }
     }
 }
