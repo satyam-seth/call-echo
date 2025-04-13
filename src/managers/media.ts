@@ -31,10 +31,46 @@ export class MediaManager {
         }
     }
 
+    // Stops all tracks in the media stream
     stopMediaStream() {
-        if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(track => track.stop());
-            this.mediaStream = null;
-        }
+        this.mediaStream?.getTracks().forEach(track => track.stop());
+        this.mediaStream = null;
+    }
+
+    // Toggles a track's enabled state (for audio or video)
+    toggleTrack(trackType: 'audio' | 'video') {
+        this.mediaStream?.getTracks().forEach(track => {
+            if (track.kind === trackType) {
+                track.enabled = !track.enabled;
+            }
+        });
+    }
+
+    // Enable all tracks of a specific type
+    enableTrack(trackType: 'audio' | 'video') {
+        this.mediaStream?.getTracks().forEach(track => {
+            if (track.kind === trackType) {
+                track.enabled = true;
+            }
+        });
+    }
+
+    // Disable all tracks of a specific type
+    disableTrack(trackType: 'audio' | 'video') {
+        this.mediaStream?.getTracks().forEach(track => {
+            if (track.kind === trackType) {
+                track.enabled = false;
+            }
+        });
+    }
+
+    // Check if any track of a specific type is enabled
+    isTrackEnabled(trackType: 'audio' | 'video'): boolean {
+        return this.mediaStream?.getTracks().some(track => track.kind === trackType && track.enabled) ?? false;
+    }
+
+    // Get the current media stream
+    getMediaStream(): MediaStream | null {
+        return this.mediaStream;
     }
 }
