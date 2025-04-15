@@ -1,5 +1,7 @@
 import { MediaManager } from "./managers/media";
 
+let deviceChangeCallbackId: number | null = null;
+
 function getButton(innerText: string, id: string, onClick: (e: MouseEvent) => Promise<void> | void, disabled: boolean = false): HTMLButtonElement {
     const button = document.createElement('button');
     button.id = id;
@@ -124,6 +126,7 @@ function stopLocalStreamButton(): HTMLButtonElement {
         resetMediaElements();
         removeDeviceSelectors();
         MediaManager.instance.stopMediaStream();
+        unregisterDeviceChangeEvents();
     }, true);
 }
 
@@ -145,7 +148,7 @@ function getAudioElement(stream: MediaStream) {
     return audioElement;
 }
 
-function getDevicesSelector(id: string, devices: MediaDeviceInfo[], onChange: (deviceId: string) => Promise<void>): HTMLSelectElement {
+function getDevicesSelector(id: string, devices: MediaDeviceInfo[], onChange: (deviceId: string) => Promise<void>, selectedDeviceId?: string): HTMLSelectElement {
     const selector = document.createElement('select');
     selector.id = id;
 
@@ -153,6 +156,7 @@ function getDevicesSelector(id: string, devices: MediaDeviceInfo[], onChange: (d
         const option = document.createElement('option');
         option.value = device.deviceId;
         option.textContent = device.label || `Device ${device.deviceId}`;
+        option.selected = selectedDeviceId !== undefined && device.deviceId === selectedDeviceId;
         selector.appendChild(option);
     });
 
@@ -163,7 +167,7 @@ function getDevicesSelector(id: string, devices: MediaDeviceInfo[], onChange: (d
     return selector;
 }
 
-function getAudioInputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
+function getAudioInputDevicesSelectorContainer(devices: MediaDeviceInfo[], selectedDeviceId?: string) {
     const container = document.createElement('div');
     container.className = 'audio-input-devices-selector-container';
 
@@ -172,11 +176,12 @@ function getAudioInputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
     const label = document.createElement('label');
     label.textContent = 'Audio Input Devices:';
     label.setAttribute('for', selectorId);
-
     container.appendChild(label);
-    container.appendChild(getDevicesSelector(selectorId, devices, async (deviceId: string) => {
+
+    const deviceSelector = getDevicesSelector(selectorId, devices, async (deviceId: string) => {
         await MediaManager.instance.setAudioInputDevice(deviceId, updateAudioElementsStream);
-    }));
+    }, selectedDeviceId);
+    container.appendChild(deviceSelector);
 
     return container;
 }
@@ -208,7 +213,7 @@ function getAudioOutputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
     return container;
 }
 
-function getVideoInputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
+function getVideoInputDevicesSelectorContainer(devices: MediaDeviceInfo[], selectedDeviceId?: string) {
     const container = document.createElement('div');
     container.className = 'video-input-devices-selector-container';
 
@@ -217,13 +222,65 @@ function getVideoInputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
     const label = document.createElement('label');
     label.textContent = 'Video Input Devices:';
     label.setAttribute('for', selectorId);
-
     container.appendChild(label);
-    container.appendChild(getDevicesSelector(selectorId, devices, async (deviceId: string) => {
+
+    const deviceSelector = getDevicesSelector(selectorId, devices, async (deviceId: string) => {
         await MediaManager.instance.setVideoInputDevice(deviceId, updateVideoElementsStream);
-    }));
+    }, selectedDeviceId)
+    container.appendChild(deviceSelector);
 
     return container;
+}
+
+function unregisterDeviceChangeEvents() {
+    if (deviceChangeCallbackId === null) return;
+    MediaManager.instance.unregisterDeviceChange(deviceChangeCallbackId);
+    deviceChangeCallbackId = null
+}
+
+function registerDeviceChangeEvents(forAudioElementOnly: boolean) {
+
+    // on device change 
+    deviceChangeCallbackId = MediaManager.instance.registerDeviceChange(async () => {
+        console.log('Device changed');
+
+
+        // check if stream is close then we have to get the stream again
+        if (MediaManager.instance.mediaStream === null) {
+            console.info('Media stream is null, getting new stream');
+            // get the stream again
+            const stream = await MediaManager.instance.getUserMedia({ video: forAudioElementOnly ? false : true, audio: true });
+
+            const videoElement = document.querySelector<HTMLVideoElement>('video');
+            const audioElement = document.querySelector<HTMLAudioElement>('audio');
+
+            if (audioElement && forAudioElementOnly) {
+                console.info('Updating audio stream to audio element');
+                audioElement.srcObject = stream;
+            }
+            else if (videoElement) {
+                console.info('Updating video stream to video element');
+                videoElement.srcObject = stream;
+            }
+        }
+
+        const mediaContainer = document.querySelector<HTMLDivElement>('.media-container')!;
+        removeDeviceSelectors();
+
+        const audioInputDevices = MediaManager.instance.getAudioInputDevices();
+        const audioOutputDevices = MediaManager.instance.getAudioOutputDevices();
+        const selectedAudioInputDeviceId = MediaManager.instance.currentAudioInputDeviceId;
+
+        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
+        mediaContainer.append(getAudioOutputDevicesSelectorContainer(audioOutputDevices));
+
+        if (!forAudioElementOnly) {
+            const videoInputDevices = MediaManager.instance.getVideoInputDevices();
+            const selectedVideoInputDeviceId = MediaManager.instance.currentVideoInputDeviceId;
+
+            mediaContainer.append(getVideoInputDevicesSelectorContainer(videoInputDevices, selectedVideoInputDeviceId));
+        }
+    });
 }
 
 function getLocalStreamVideoButton(): HTMLButtonElement {
@@ -240,9 +297,13 @@ function getLocalStreamVideoButton(): HTMLButtonElement {
         const audioInputDevices = MediaManager.instance.getAudioInputDevices();
         const audioOutputDevices = MediaManager.instance.getAudioOutputDevices();
         const videoInputDevices = MediaManager.instance.getVideoInputDevices();
-        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices));
+        const selectedAudioInputDeviceId = MediaManager.instance.currentAudioInputDeviceId;
+        const selectedVideoInputDeviceId = MediaManager.instance.currentVideoInputDeviceId;
+        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
         mediaContainer.append(getAudioOutputDevicesSelectorContainer(audioOutputDevices));
-        mediaContainer.append(getVideoInputDevicesSelectorContainer(videoInputDevices));
+        mediaContainer.append(getVideoInputDevicesSelectorContainer(videoInputDevices, selectedVideoInputDeviceId));
+        registerDeviceChangeEvents(false);
+
     });
 }
 
@@ -258,8 +319,10 @@ function getLocalStreamAudioButton(): HTMLButtonElement {
         await MediaManager.instance.enumerateDevices();
         const audioInputDevices = MediaManager.instance.getAudioInputDevices();
         const audioOutputDevices = MediaManager.instance.getAudioOutputDevices();
-        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices));
+        const selectedAudioInputDeviceId = MediaManager.instance.currentAudioInputDeviceId;
+        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
         mediaContainer.append(getAudioOutputDevicesSelectorContainer(audioOutputDevices));
+        registerDeviceChangeEvents(true);
     });
 }
 
