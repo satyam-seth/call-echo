@@ -1,6 +1,6 @@
-import './style.css'
-import { getPermissionContainer } from './pemissionsDemo.ts'
-import { getMediaContainer } from './mediaDemo.ts';
+import './style.css';
+import { getPermissionContainer } from './ui/permission.ts';
+import { getMediaContainer } from './ui/media.ts';
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 

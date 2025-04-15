@@ -1,4 +1,4 @@
-import { MediaManager } from "./managers/media";
+import { MediaManager } from "../managers/media";
 
 let deviceChangeCallbackId: number | null = null;
 

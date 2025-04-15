@@ -1,4 +1,4 @@
-import { PermissionManager } from "./managers/permission";
+import { PermissionManager } from "../managers/permission";
 
 const PERMISSIONS: PermissionName[] = [
   'microphone',
