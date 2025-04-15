@@ -48,6 +48,10 @@ export function getPermissionContainer() {
   const container = document.createElement('div');
   container.className = 'permission-container';
 
+  const heading = document.createElement('h2');
+  heading.innerText = 'Permission Demo';
+  container.appendChild(heading);
+
   PERMISSIONS.forEach(permissionName => {
     const permissionSection = document.createElement('div');
     permissionSection.className = 'permission-section';
