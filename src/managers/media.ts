@@ -1,16 +1,36 @@
 // https://developer.mozilla.org/en-US/docs/Web/API/Media_Capture_and_Streams_API
+
+// TODO: Add support for groupId in constraints and selecting devices by groupId
+// https://www.webrtc-developers.com/managing-devices-in-webrtc/#grouping-devices-together
+
+// TODO: Add support for output devices change detection, current implementation only supports input devices change detection
+
+// TODO: Add support for replace track for audio and video tracks and notify the change to the stream for smooth switching between input devices
+// https://developer.mozilla.org/en-US/docs/Web/API/MediaStream/replaceTrack
+
+// TODO: Add support for screen sharing
+// https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
+
+// TODO: Add support for media stream recording
+// https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder
+
 export class MediaManager {
     private static _instance: MediaManager;
 
-    private mediaStream: MediaStream | null = null;
+    private constraints?: MediaStreamConstraints;
+    private _mediaStream: MediaStream | null = null;
 
     private audioInputDevices: MediaDeviceInfo[] = [];
     private audioOutputDevices: MediaDeviceInfo[] = [];
     private videoInputDevices: MediaDeviceInfo[] = [];
 
-    private constraints?: MediaStreamConstraints;
+    private nextCallbackId = 0;
+    private deviceChangeCallbacks: Map<number, () => Promise<void>> = new Map();
 
-    private constructor() { }
+    private constructor() {
+        // start listening for device changes
+        this.startListeningToDeviceChanges();
+    }
 
     public static get instance(): MediaManager {
         if (!MediaManager._instance) {
@@ -30,8 +50,9 @@ export class MediaManager {
             this.stopMediaStream();
 
             this.constraints = options;
-            this.mediaStream = await navigator.mediaDevices.getUserMedia(this.constraints);
-            return this.mediaStream;
+            this._mediaStream = await navigator.mediaDevices.getUserMedia(this.constraints);
+
+            return this._mediaStream;
         }
         catch (error) {
             console.error('Error accessing media devices.', error);
@@ -41,13 +62,13 @@ export class MediaManager {
 
     // Stops all tracks in the media stream
     stopMediaStream() {
-        this.mediaStream?.getTracks().forEach(track => track.stop());
-        this.mediaStream = null;
+        this._mediaStream?.getTracks().forEach(track => track.stop());
+        this._mediaStream = null;
     }
 
     // Toggles a track's enabled state (for audio or video)
     toggleTrack(trackType: 'audio' | 'video') {
-        this.mediaStream?.getTracks().forEach(track => {
+        this._mediaStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = !track.enabled;
             }
@@ -56,7 +77,7 @@ export class MediaManager {
 
     // Enable all tracks of a specific type
     enableTrack(trackType: 'audio' | 'video') {
-        this.mediaStream?.getTracks().forEach(track => {
+        this._mediaStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = true;
             }
@@ -65,7 +86,7 @@ export class MediaManager {
 
     // Disable all tracks of a specific type
     disableTrack(trackType: 'audio' | 'video') {
-        this.mediaStream?.getTracks().forEach(track => {
+        this._mediaStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = false;
             }
@@ -74,12 +95,12 @@ export class MediaManager {
 
     // Check if any track of a specific type is enabled
     isTrackEnabled(trackType: 'audio' | 'video'): boolean {
-        return this.mediaStream?.getTracks().some(track => track.kind === trackType && track.enabled) ?? false;
+        return this._mediaStream?.getTracks().some(track => track.kind === trackType && track.enabled) ?? false;
     }
 
     // Get the current media stream
-    getMediaStream(): MediaStream | null {
-        return this.mediaStream;
+    get mediaStream(): MediaStream | null {
+        return this._mediaStream;
     }
 
     // Get the current media stream constraints
@@ -125,7 +146,7 @@ export class MediaManager {
         // check if previous stream is null or not and any track is disabled then we have to disable the track in new stream
         let audioTrackEnabled = true;
         let videoTrackEnabled = true;
-        if (this.mediaStream) {
+        if (this._mediaStream) {
             audioTrackEnabled = this.isTrackEnabled('audio');
             videoTrackEnabled = this.isTrackEnabled('video');
         }
@@ -171,9 +192,11 @@ export class MediaManager {
         }
     }
 
+    // TODO: verify if this is working in all browsers and platforms
     async setAudioOutputDevice(element: HTMLAudioElement | HTMLVideoElement, deviceId: string): Promise<boolean> {
         if (typeof element.sinkId !== 'undefined') {
             try {
+                console.log('Setting audio output device to:', deviceId);
                 await element.setSinkId(deviceId);
             } catch (error: any) {
 
@@ -189,5 +212,58 @@ export class MediaManager {
             console.warn('Browser does not support output device selection.');
             return false;
         }
+    }
+
+    get currentAudioInputDeviceId(): string | undefined {
+        return this._mediaStream?.getAudioTracks()[0]?.getSettings().deviceId;
+    }
+
+    get currentVideoInputDeviceId(): string | undefined {
+        return this._mediaStream?.getVideoTracks()[0]?.getSettings().deviceId;
+    }
+
+    registerDeviceChange(callback: () => Promise<void>): number {
+        const id = this.nextCallbackId++;
+        this.deviceChangeCallbacks.set(id, callback);
+
+        // Return callback id for unsubscribing
+        return id;
+    }
+
+    unregisterDeviceChange(callbackId: number): void {
+        this.deviceChangeCallbacks.delete(callbackId);
+    }
+
+    private notifyDeviceChange(): void {
+        console.log("Notifying device change callbacks.", this.deviceChangeCallbacks.size);
+
+        for (const cb of this.deviceChangeCallbacks.values()) {
+            cb();
+        }
+    }
+
+    // Start listening to device changes
+    async startListeningToDeviceChanges(): Promise<void> {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.addEventListener) {
+            console.warn("Device change events are not supported in this browser.");
+            return;
+        }
+
+        navigator.mediaDevices.addEventListener('devicechange', async () => {
+            console.log("Device change detected.");
+            await this.enumerateDevices();
+
+            // should restart stream if the current device is not available
+            if (this._mediaStream) {
+                const audioInputDevice = this.currentAudioInputDeviceId;
+                const videoInputDevice = this.currentVideoInputDeviceId;
+
+                if ((audioInputDevice && !this.audioInputDevices.some(device => device.deviceId === audioInputDevice)) || (videoInputDevice && !this.videoInputDevices.some(device => device.deviceId === videoInputDevice))) {
+                    this.stopMediaStream();
+                }
+            }
+
+            this.notifyDeviceChange();
+        });
     }
 }
