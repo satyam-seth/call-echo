@@ -18,7 +18,10 @@ export class MediaManager {
     private static _instance: MediaManager;
 
     private constraints?: MediaStreamConstraints;
+    private _displayConstraints?: MediaStreamConstraints;
+
     private _mediaStream: MediaStream | null = null;
+    private _displayStream: MediaStream | null = null;
 
     private audioInputDevices: MediaDeviceInfo[] = [];
     private audioOutputDevices: MediaDeviceInfo[] = [];
@@ -37,6 +40,46 @@ export class MediaManager {
             MediaManager._instance = new MediaManager();
         }
         return MediaManager._instance;
+    }
+
+    async getDisplayMedia(options?: MediaStreamConstraints): Promise<MediaStream> {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                throw new Error('getDisplayMedia is not supported in this browser.');
+            }
+
+            // Stop any existing display stream
+            this.stopDisplayStream();
+
+            this._displayConstraints = options;
+            this._displayStream = await navigator.mediaDevices.getDisplayMedia(this._displayConstraints);
+            return this._displayStream;
+        } catch (error) {
+            console.error('Error accessing display media.', error);
+            throw error;
+        }
+    }
+
+    // Stops all tracks in the display stream
+    stopDisplayStream() {
+        this._displayStream?.getTracks().forEach(track => track.stop());
+        this._displayStream = null;
+    }
+
+    // Get the current display stream
+    get displayStream(): MediaStream | null {
+        return this._displayStream;
+    }
+
+
+    // Get the current display stream constraints
+    get displayStreamConstraints(): MediaStreamConstraints | undefined {
+        return this._displayConstraints;
+    }
+
+    // Check if the display stream is active
+    isDisplayStreamActive(): boolean {
+        return !!this._displayStream && this._displayStream.getTracks().some(track => track.readyState === 'live');
     }
 
     async getUserMedia(options?: MediaStreamConstraints): Promise<MediaStream> {
