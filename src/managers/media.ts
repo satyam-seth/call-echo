@@ -17,15 +17,15 @@
 export class MediaManager {
     private static _instance: MediaManager;
 
-    private constraints?: MediaStreamConstraints;
+    private _userConstraints?: MediaStreamConstraints;
     private _displayConstraints?: MediaStreamConstraints;
 
-    private _mediaStream: MediaStream | null = null;
+    private _userStream: MediaStream | null = null;
     private _displayStream: MediaStream | null = null;
 
-    private audioInputDevices: MediaDeviceInfo[] = [];
-    private audioOutputDevices: MediaDeviceInfo[] = [];
-    private videoInputDevices: MediaDeviceInfo[] = [];
+    private _audioInputDevices: MediaDeviceInfo[] = [];
+    private _audioOutputDevices: MediaDeviceInfo[] = [];
+    private _videoInputDevices: MediaDeviceInfo[] = [];
 
     private nextCallbackId = 0;
     private deviceChangeCallbacks: Map<number, () => Promise<void>> = new Map();
@@ -78,7 +78,7 @@ export class MediaManager {
     }
 
     // Check if the display stream is active
-    isDisplayStreamActive(): boolean {
+    get displayStreamActive(): boolean {
         return !!this._displayStream && this._displayStream.getTracks().some(track => track.readyState === 'live');
     }
 
@@ -92,10 +92,10 @@ export class MediaManager {
             // Stop any existing tracks before starting a new one
             this.stopMediaStream();
 
-            this.constraints = options;
-            this._mediaStream = await navigator.mediaDevices.getUserMedia(this.constraints);
+            this._userConstraints = options;
+            this._userStream = await navigator.mediaDevices.getUserMedia(this._userConstraints);
 
-            return this._mediaStream;
+            return this._userStream;
         }
         catch (error) {
             console.error('Error accessing media devices.', error);
@@ -105,13 +105,13 @@ export class MediaManager {
 
     // Stops all tracks in the media stream
     stopMediaStream() {
-        this._mediaStream?.getTracks().forEach(track => track.stop());
-        this._mediaStream = null;
+        this._userStream?.getTracks().forEach(track => track.stop());
+        this._userStream = null;
     }
 
     // Toggles a track's enabled state (for audio or video)
     toggleTrack(trackType: 'audio' | 'video') {
-        this._mediaStream?.getTracks().forEach(track => {
+        this._userStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = !track.enabled;
             }
@@ -120,7 +120,7 @@ export class MediaManager {
 
     // Enable all tracks of a specific type
     enableTrack(trackType: 'audio' | 'video') {
-        this._mediaStream?.getTracks().forEach(track => {
+        this._userStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = true;
             }
@@ -129,7 +129,7 @@ export class MediaManager {
 
     // Disable all tracks of a specific type
     disableTrack(trackType: 'audio' | 'video') {
-        this._mediaStream?.getTracks().forEach(track => {
+        this._userStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = false;
             }
@@ -138,17 +138,17 @@ export class MediaManager {
 
     // Check if any track of a specific type is enabled
     isTrackEnabled(trackType: 'audio' | 'video'): boolean {
-        return this._mediaStream?.getTracks().some(track => track.kind === trackType && track.enabled) ?? false;
+        return this._userStream?.getTracks().some(track => track.kind === trackType && track.enabled) ?? false;
     }
 
-    // Get the current media stream
-    get mediaStream(): MediaStream | null {
-        return this._mediaStream;
+    // Get the current user stream
+    get userStream(): MediaStream | null {
+        return this._userStream;
     }
 
-    // Get the current media stream constraints
-    getMediaStreamConstraints(): MediaStreamConstraints | undefined {
-        return this.constraints;
+    // Get the current user stream constraints
+    get userStreamConstraints(): MediaStreamConstraints | undefined {
+        return this._userConstraints;
     }
 
     // Enumerate devices (input and output)
@@ -159,9 +159,9 @@ export class MediaManager {
 
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
-            this.audioInputDevices = devices.filter(device => device.kind === "audioinput");
-            this.videoInputDevices = devices.filter(device => device.kind === "videoinput");
-            this.audioOutputDevices = devices.filter(device => device.kind === "audiooutput");
+            this._audioInputDevices = devices.filter(device => device.kind === "audioinput");
+            this._videoInputDevices = devices.filter(device => device.kind === "videoinput");
+            this._audioOutputDevices = devices.filter(device => device.kind === "audiooutput");
             return devices;
         } catch (err) {
             console.error("Error enumerating devices:", err);
@@ -170,18 +170,18 @@ export class MediaManager {
     }
 
     // Get audio input devices
-    getAudioInputDevices(): MediaDeviceInfo[] {
-        return this.audioInputDevices;
+    get audioInputDevices(): MediaDeviceInfo[] {
+        return this._audioInputDevices;
     }
 
     // Get audio output devices
-    getAudioOutputDevices(): MediaDeviceInfo[] {
-        return this.audioOutputDevices;
+    get audioOutputDevices(): MediaDeviceInfo[] {
+        return this._audioOutputDevices;
     }
 
     // Get video input devices
-    getVideoInputDevices(): MediaDeviceInfo[] {
-        return this.videoInputDevices;
+    get videoInputDevices(): MediaDeviceInfo[] {
+        return this._videoInputDevices;
     }
 
     // Set input device
@@ -189,7 +189,7 @@ export class MediaManager {
         // check if previous stream is null or not and any track is disabled then we have to disable the track in new stream
         let audioTrackEnabled = true;
         let videoTrackEnabled = true;
-        if (this._mediaStream) {
+        if (this._userStream) {
             audioTrackEnabled = this.isTrackEnabled('audio');
             videoTrackEnabled = this.isTrackEnabled('video');
         }
@@ -213,7 +213,7 @@ export class MediaManager {
 
     // Set input device for audio
     async setAudioInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<boolean> {
-        const constraints: MediaStreamConstraints = { ...this.constraints, audio: { deviceId: { exact: deviceId } } };
+        const constraints: MediaStreamConstraints = { ...this._userConstraints, audio: { deviceId: { exact: deviceId } } };
         try {
             await this.setInputDevice(constraints, onStream);
             return true;
@@ -225,7 +225,7 @@ export class MediaManager {
 
     // Set input device for video
     async setVideoInputDevice(deviceId: string, onStream: (stream: MediaStream) => void): Promise<boolean> {
-        const constraints: MediaStreamConstraints = { ...this.constraints, video: { deviceId: { exact: deviceId } } };
+        const constraints: MediaStreamConstraints = { ...this._userConstraints, video: { deviceId: { exact: deviceId } } };
         try {
             await this.setInputDevice(constraints, onStream);
             return true;
@@ -258,11 +258,11 @@ export class MediaManager {
     }
 
     get currentAudioInputDeviceId(): string | undefined {
-        return this._mediaStream?.getAudioTracks()[0]?.getSettings().deviceId;
+        return this._userStream?.getAudioTracks()[0]?.getSettings().deviceId;
     }
 
     get currentVideoInputDeviceId(): string | undefined {
-        return this._mediaStream?.getVideoTracks()[0]?.getSettings().deviceId;
+        return this._userStream?.getVideoTracks()[0]?.getSettings().deviceId;
     }
 
     registerDeviceChange(callback: () => Promise<void>): number {
@@ -297,11 +297,11 @@ export class MediaManager {
             await this.enumerateDevices();
 
             // should restart stream if the current device is not available
-            if (this._mediaStream) {
+            if (this._userStream) {
                 const audioInputDevice = this.currentAudioInputDeviceId;
                 const videoInputDevice = this.currentVideoInputDeviceId;
 
-                if ((audioInputDevice && !this.audioInputDevices.some(device => device.deviceId === audioInputDevice)) || (videoInputDevice && !this.videoInputDevices.some(device => device.deviceId === videoInputDevice))) {
+                if ((audioInputDevice && !this._audioInputDevices.some(device => device.deviceId === audioInputDevice)) || (videoInputDevice && !this._videoInputDevices.some(device => device.deviceId === videoInputDevice))) {
                     this.stopMediaStream();
                 }
             }
