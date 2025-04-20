@@ -1,4 +1,3 @@
-// https://developer.mozilla.org/en-US/docs/Web/API/Media_Capture_and_Streams_API
 
 // TODO: Add support for groupId in constraints and selecting devices by groupId
 // https://www.webrtc-developers.com/managing-devices-in-webrtc/#grouping-devices-together
@@ -7,9 +6,6 @@
 
 // TODO: Add support for replace track for audio and video tracks and notify the change to the stream for smooth switching between input devices
 // https://developer.mozilla.org/en-US/docs/Web/API/MediaStream/replaceTrack
-
-// TODO: Add support for screen sharing
-// https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
 
 // TODO: Add support for media stream recording
 // https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder
@@ -29,6 +25,7 @@ export class MediaManager {
 
     private nextCallbackId = 0;
     private deviceChangeCallbacks: Map<number, () => Promise<void>> = new Map();
+    private displayStreamEndCallbacks: Map<number, () => Promise<void>> = new Map();
 
     private constructor() {
         // start listening for device changes
@@ -42,6 +39,7 @@ export class MediaManager {
         return MediaManager._instance;
     }
 
+    // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
     async getDisplayMedia(options?: MediaStreamConstraints): Promise<MediaStream> {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
@@ -53,6 +51,13 @@ export class MediaManager {
 
             this._displayConstraints = options;
             this._displayStream = await navigator.mediaDevices.getDisplayMedia(this._displayConstraints);
+            this._displayStream.getVideoTracks().forEach(track => {
+                track.onended = () => {
+                    console.log('Display track ended');
+                    this.stopDisplayStream();
+                    this.notifyDisplayStreamEnd();
+                };
+            });
             return this._displayStream;
         } catch (error) {
             console.error('Error accessing display media.', error);
@@ -82,6 +87,27 @@ export class MediaManager {
         return !!this._displayStream && this._displayStream.getTracks().some(track => track.readyState === 'live');
     }
 
+    private notifyDisplayStreamEnd(): void {
+        console.log("Notifying display stream end callbacks.", this.deviceChangeCallbacks.size);
+
+        for (const cb of this.displayStreamEndCallbacks.values()) {
+            cb();
+        }
+    }
+
+    unregisterDisplayStreamEnd(callbackId: number): void {
+        this.displayStreamEndCallbacks.delete(callbackId);
+    }
+
+    registerDisplayStreamEnd(callback: () => Promise<void>): number {
+        const id = this.nextCallbackId++;
+        this.displayStreamEndCallbacks.set(id, callback);
+
+        // Return callback id for unsubscribing
+        return id;
+    }
+
+    // https://developer.mozilla.org/en-US/docs/Web/API/Media_Capture_and_Streams_API
     async getUserMedia(options?: MediaStreamConstraints): Promise<MediaStream> {
         try {
             // Check if the browser supports getUserMedia
@@ -109,8 +135,8 @@ export class MediaManager {
         this._userStream = null;
     }
 
-    // Toggles a track's enabled state (for audio or video)
-    toggleTrack(trackType: 'audio' | 'video') {
+    // Toggles a user track's enabled state (for audio or video)
+    toggleUserTrack(trackType: 'audio' | 'video') {
         this._userStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = !track.enabled;
@@ -118,8 +144,8 @@ export class MediaManager {
         });
     }
 
-    // Enable all tracks of a specific type
-    enableTrack(trackType: 'audio' | 'video') {
+    // Enable all user tracks of a specific type
+    enableUserTrack(trackType: 'audio' | 'video') {
         this._userStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = true;
@@ -127,8 +153,8 @@ export class MediaManager {
         });
     }
 
-    // Disable all tracks of a specific type
-    disableTrack(trackType: 'audio' | 'video') {
+    // Disable all user tracks of a specific type
+    disableUserTrack(trackType: 'audio' | 'video') {
         this._userStream?.getTracks().forEach(track => {
             if (track.kind === trackType) {
                 track.enabled = false;
@@ -137,7 +163,7 @@ export class MediaManager {
     }
 
     // Check if any track of a specific type is enabled
-    isTrackEnabled(trackType: 'audio' | 'video'): boolean {
+    isUserTrackEnabled(trackType: 'audio' | 'video'): boolean {
         return this._userStream?.getTracks().some(track => track.kind === trackType && track.enabled) ?? false;
     }
 
@@ -190,8 +216,8 @@ export class MediaManager {
         let audioTrackEnabled = true;
         let videoTrackEnabled = true;
         if (this._userStream) {
-            audioTrackEnabled = this.isTrackEnabled('audio');
-            videoTrackEnabled = this.isTrackEnabled('video');
+            audioTrackEnabled = this.isUserTrackEnabled('audio');
+            videoTrackEnabled = this.isUserTrackEnabled('video');
         }
 
         try {
@@ -199,10 +225,10 @@ export class MediaManager {
 
             // Disable the tracks based on the previous stream state, by default all tracks are enabled
             if (!audioTrackEnabled) {
-                this.disableTrack('audio');
+                this.disableUserTrack('audio');
             }
             if (!videoTrackEnabled) {
-                this.disableTrack('video');
+                this.disableUserTrack('video');
             }
 
             onStream(stream);
