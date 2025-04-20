@@ -1,6 +1,7 @@
 import { MediaManager } from "../managers/media";
 
 let deviceChangeCallbackId: number | null = null;
+let displayStreamEndCallbackId: number | null = null;
 
 function getButton(innerText: string, id: string, onClick: (e: MouseEvent) => Promise<void> | void, disabled: boolean = false): HTMLButtonElement {
     const button = document.createElement('button');
@@ -16,87 +17,99 @@ function toggleButtonDisabled(id: string, isDisabled: boolean) {
     button.disabled = isDisabled;
 }
 
-function enableLocalStreamButton() {
-    toggleButtonDisabled('stop-local-stream-btn', false);
+function enableStopLocalUserStreamButton() {
+    toggleButtonDisabled('stop-local-user-stream-btn', false);
 }
 
-function enableToggleAudioButton() {
-    const button = document.querySelector<HTMLButtonElement>(`#toggle-audio-btn`)!;
+function enableStopLocalDisplayStreamButton() {
+    toggleButtonDisabled('stop-local-display-stream-btn', false);
+}
+
+function enableToggleUserAudioButton() {
+    const button = document.querySelector<HTMLButtonElement>(`#toggle-user-audio-btn`)!;
     button.disabled = false;
-    button.innerText = 'Disable Audio';
+    button.innerText = 'Disable User Audio';
 }
 
-function disableToggleAudioButton() {
-    const button = document.querySelector<HTMLButtonElement>(`#toggle-audio-btn`)!;
+function disableToggleUserAudioButton() {
+    const button = document.querySelector<HTMLButtonElement>(`#toggle-user-audio-btn`)!;
     button.disabled = true;
-    button.innerText = 'Enable Audio';
+    button.innerText = 'Enable User Audio';
 }
 
-function enableToggleVideoButton() {
-    const button = document.querySelector<HTMLButtonElement>(`#toggle-video-btn`)!;
+function enableToggleUserVideoButton() {
+    const button = document.querySelector<HTMLButtonElement>(`#toggle-user-video-btn`)!;
     button.disabled = false;
-    button.innerText = 'Disable Video';
+    button.innerText = 'Disable User Video';
 }
 
-function disableToggleVideoButton() {
-    const button = document.querySelector<HTMLButtonElement>(`#toggle-video-btn`)!;
+function disableToggleUserVideoButton() {
+    const button = document.querySelector<HTMLButtonElement>(`#toggle-user-video-btn`)!;
     button.disabled = true;
-    button.innerText = 'Enable Video';
+    button.innerText = 'Enable User Video';
 }
 
-function disableLocalStreamVideoButton() {
-    toggleButtonDisabled('local-stream-video-btn', true);
+function disableLocalUserStreamVideoButton() {
+    toggleButtonDisabled('local-user-stream-video-btn', true);
 }
 
-function enableLocalStreamVideoButton() {
-    toggleButtonDisabled('local-stream-video-btn', false);
+function enableLocalUserStreamVideoButton() {
+    toggleButtonDisabled('local-user-stream-video-btn', false);
 }
 
-function disableLocalStreamAudioButton() {
-    toggleButtonDisabled('local-stream-audio-btn', true);
+function disableLocalUserStreamAudioButton() {
+    toggleButtonDisabled('local-user-stream-audio-btn', true);
 }
 
-function enableLocalStreamAudioButton() {
-    toggleButtonDisabled('local-stream-audio-btn', false);
+function enableLocalUserStreamAudioButton() {
+    toggleButtonDisabled('local-user-stream-audio-btn', false);
 }
 
-function onToggleAudioButtonClick(e: MouseEvent) {
-    MediaManager.instance.toggleTrack('audio');
-    const isAudioEnabled = MediaManager.instance.isTrackEnabled('audio');
-    (e.target as HTMLButtonElement).innerText = isAudioEnabled ? 'Disable Audio' : 'Enable Audio';
+function disableLocalDisplayStreamButton() {
+    toggleButtonDisabled('local-display-stream-btn', true);
 }
 
-function toggleAudioButton() {
-    return getButton('Disable Audio', 'toggle-audio-btn', onToggleAudioButtonClick, true);
+function enableLocalDisplayStreamButton() {
+    toggleButtonDisabled('local-display-stream-btn', false);
 }
 
-function onToggleVideoButtonClick(e: MouseEvent) {
-    MediaManager.instance.toggleTrack('video');
-    const isAudioEnabled = MediaManager.instance.isTrackEnabled('video');
-    (e.target as HTMLButtonElement).innerText = isAudioEnabled ? 'Disable Video' : 'Enable Video';
+function onToggleUserAudioButtonClick(e: MouseEvent) {
+    MediaManager.instance.toggleUserTrack('audio');
+    const isAudioEnabled = MediaManager.instance.isUserTrackEnabled('audio');
+    (e.target as HTMLButtonElement).innerText = isAudioEnabled ? 'Disable User Audio' : 'Enable User Audio';
 }
 
-function toggleVideoButton() {
-    return getButton('Disable Video', 'toggle-video-btn', onToggleVideoButtonClick, true);
+function toggleUserAudioButton() {
+    return getButton('Disable User Audio', 'toggle-user-audio-btn', onToggleUserAudioButtonClick, true);
 }
 
-function updateAudioElementsStream(stream: MediaStream) {
-    const audioElement = document.querySelector<HTMLAudioElement>('audio');
+function onToggleUserVideoButtonClick(e: MouseEvent) {
+    MediaManager.instance.toggleUserTrack('video');
+    const isAudioEnabled = MediaManager.instance.isUserTrackEnabled('video');
+    (e.target as HTMLButtonElement).innerText = isAudioEnabled ? 'Disable User Video' : 'Enable User Video';
+}
+
+function toggleUserVideoButton() {
+    return getButton('Disable Video', 'toggle-user-video-btn', onToggleUserVideoButtonClick, true);
+}
+
+function updateUserAudioElementsStream(stream: MediaStream) {
+    const audioElement = document.querySelector<HTMLAudioElement>('audio#user-audio');
     if (audioElement) {
         audioElement.srcObject = stream;
     }
 }
 
-function updateVideoElementsStream(stream: MediaStream) {
-    const videoElement = document.querySelector<HTMLVideoElement>('video');
+function updateUserVideoElementsStream(stream: MediaStream) {
+    const videoElement = document.querySelector<HTMLVideoElement>('video#user-video');
     if (videoElement) {
         videoElement.srcObject = stream;
     }
 }
 
-function resetMediaElements() {
-    const videoElement = document.querySelector<HTMLVideoElement>('video');
-    const audioElement = document.querySelector<HTMLAudioElement>('audio');
+function resetUserMediaElements() {
+    const videoElement = document.querySelector<HTMLVideoElement>('video#user-video');
+    const audioElement = document.querySelector<HTMLAudioElement>('audio#user-audio');
     if (videoElement) {
         videoElement.srcObject = null;
         videoElement.remove();
@@ -107,31 +120,58 @@ function resetMediaElements() {
     }
 }
 
-function removeDeviceSelectors() {
-    const audioInputDevicesSelectorContainer = document.querySelector<HTMLDivElement>('.audio-input-devices-selector-container');
-    const audioOutputDevicesSelectorContainer = document.querySelector<HTMLDivElement>('.audio-output-devices-selector-container');
-    const videoInputDevicesSelectorContainer = document.querySelector<HTMLDivElement>('.video-input-devices-selector-container');
+function resetDisplayMediaElements() {
+    const videoElement = document.querySelector<HTMLVideoElement>('video#display-video');
+    if (videoElement) {
+        videoElement.srcObject = null;
+        videoElement.remove();
+    }
+}
+
+function removeUserDeviceSelectors() {
+    const audioInputDevicesSelectorContainer = document.querySelector<HTMLDivElement>('.user-audio-input-devices-selector-container');
+    const audioOutputDevicesSelectorContainer = document.querySelector<HTMLDivElement>('.user-audio-output-devices-selector-container');
+    const videoInputDevicesSelectorContainer = document.querySelector<HTMLDivElement>('.user-video-input-devices-selector-container');
     audioInputDevicesSelectorContainer?.remove();
     audioOutputDevicesSelectorContainer?.remove();
     videoInputDevicesSelectorContainer?.remove();
 }
 
-function stopLocalStreamButton(): HTMLButtonElement {
-    return getButton(`Stop local stream`, 'stop-local-stream-btn', async (e: Event) => {
+function stopLocalUserStreamButton(): HTMLButtonElement {
+    return getButton(`Stop local user stream`, 'stop-local-user-stream-btn', async (e: Event) => {
         (e.target as HTMLButtonElement).disabled = true;
-        enableLocalStreamAudioButton();
-        enableLocalStreamVideoButton();
-        disableToggleAudioButton();
-        disableToggleVideoButton();
-        resetMediaElements();
-        removeDeviceSelectors();
+        enableLocalUserStreamAudioButton();
+        enableLocalUserStreamVideoButton();
+        enableLocalDisplayStreamButton();
+        disableToggleUserAudioButton();
+        disableToggleUserVideoButton();
+        resetUserMediaElements();
+        removeUserDeviceSelectors();
+        unregisterUserDeviceChangeEvent();
         MediaManager.instance.stopMediaStream();
-        unregisterDeviceChangeEvents();
     }, true);
 }
 
-function getVideoElement(stream: MediaStream) {
+function stopLocalDisplayStream() {
+    enableLocalUserStreamAudioButton();
+    enableLocalUserStreamVideoButton();
+    enableLocalDisplayStreamButton();
+    resetDisplayMediaElements();
+    toggleDisplaySurfaceSelectorDisabled(false);
+    unregisterDisplayStreamEndEvent();
+    MediaManager.instance.stopDisplayStream();
+}
+
+function stopLocalDisplayStreamButton(): HTMLButtonElement {
+    return getButton(`Stop local display stream`, 'stop-local-display-stream-btn', async (e: Event) => {
+        (e.target as HTMLButtonElement).disabled = true;
+        stopLocalDisplayStream();
+    }, true);
+}
+
+function getVideoElement(stream: MediaStream, id: string) {
     const videoElement = document.createElement('video');
+    videoElement.id = id;
     videoElement.srcObject = stream;
     videoElement.autoplay = true;
     videoElement.controls = true;
@@ -140,8 +180,9 @@ function getVideoElement(stream: MediaStream) {
     return videoElement;
 }
 
-function getAudioElement(stream: MediaStream) {
+function getAudioElement(stream: MediaStream, id: string) {
     const audioElement = document.createElement('audio');
+    audioElement.id = id;
     audioElement.srcObject = stream;
     audioElement.autoplay = true;
     audioElement.controls = true;
@@ -167,31 +208,27 @@ function getDevicesSelector(id: string, devices: MediaDeviceInfo[], onChange: (d
     return selector;
 }
 
-function getAudioInputDevicesSelectorContainer(devices: MediaDeviceInfo[], selectedDeviceId?: string) {
+function getUserAudioInputDevicesSelectorContainer(devices: MediaDeviceInfo[], selectedDeviceId?: string) {
     const container = document.createElement('div');
-    container.className = 'audio-input-devices-selector-container';
-
-    const selectorId = 'audio-input-devices-selector';
-
+    container.className = 'user-audio-input-devices-selector-container';
+    const selectorId = 'user-audio-input-devices-selector';
     const label = document.createElement('label');
-    label.textContent = 'Audio Input Devices:';
+    label.textContent = 'User Audio Input Devices:';
     label.setAttribute('for', selectorId);
     container.appendChild(label);
 
     const deviceSelector = getDevicesSelector(selectorId, devices, async (deviceId: string) => {
-        await MediaManager.instance.setAudioInputDevice(deviceId, updateAudioElementsStream);
+        await MediaManager.instance.setAudioInputDevice(deviceId, updateUserAudioElementsStream);
     }, selectedDeviceId);
     container.appendChild(deviceSelector);
 
     return container;
 }
 
-function getAudioOutputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
+function getUserAudioOutputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
     const container = document.createElement('div');
-    container.className = 'audio-output-devices-selector-container';
-
-    const selectorId = 'audio-output-devices-selector';
-
+    container.className = 'user-audio-output-devices-selector-container';
+    const selectorId = 'user-audio-output-devices-selector';
     const label = document.createElement('label');
     label.textContent = 'Audio Output Devices:';
     label.setAttribute('for', selectorId);
@@ -199,12 +236,12 @@ function getAudioOutputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
     container.appendChild(label);
     container.appendChild(getDevicesSelector(selectorId, devices, async (deviceId: string) => {
         // if video element is not null then set the audio output device
-        const videoElement = document.querySelector<HTMLVideoElement>('video');
+        const videoElement = document.querySelector<HTMLVideoElement>('video#user-video');
         if (videoElement) {
             await MediaManager.instance.setAudioOutputDevice(videoElement, deviceId);
         }
         // if audio element is not null then set the audio output device
-        const audioElement = document.querySelector<HTMLAudioElement>('audio');
+        const audioElement = document.querySelector<HTMLAudioElement>('audio#user-audio');
         if (audioElement) {
             await MediaManager.instance.setAudioOutputDevice(audioElement, deviceId);
         }
@@ -213,46 +250,84 @@ function getAudioOutputDevicesSelectorContainer(devices: MediaDeviceInfo[]) {
     return container;
 }
 
-function getVideoInputDevicesSelectorContainer(devices: MediaDeviceInfo[], selectedDeviceId?: string) {
+function getDisplaySurfaceSelectorContainer() {
     const container = document.createElement('div');
-    container.className = 'video-input-devices-selector-container';
+    container.className = 'display-surface-selector-container';
+    const selectorId = 'display-surface-selector';
+    const label = document.createElement('label');
+    label.textContent = 'Display Surface:';
+    label.setAttribute('for', selectorId);
+    container.appendChild(label);
 
-    const selectorId = 'video-input-devices-selector';
 
+    const displaySurfaceSelector = document.createElement('select');
+    displaySurfaceSelector.id = selectorId;
+
+    const displaySurfaceOptions = [
+        { title: 'Show default sharing options', value: '' },
+        { title: 'Prefer to share a browser tab', value: 'browser' },
+        { title: 'Prefer to share a window', value: 'window' },
+        { title: 'Prefer to share an entire screen', value: 'monitor' },
+    ];
+
+    displaySurfaceOptions.forEach(surfaceOption => {
+        const option = document.createElement('option');
+        option.value = surfaceOption.value;
+        option.textContent = surfaceOption.title;
+        displaySurfaceSelector.appendChild(option);
+    });
+    container.appendChild(displaySurfaceSelector);
+
+    return container;
+}
+
+function getDisplaySurfaceSelectorValue(): string {
+    const displaySurfaceSelector = document.querySelector<HTMLSelectElement>('#display-surface-selector')!;
+    return displaySurfaceSelector.value;
+}
+
+function toggleDisplaySurfaceSelectorDisabled(isDisabled: boolean) {
+    const displaySurfaceSelector = document.querySelector<HTMLSelectElement>('#display-surface-selector')!;
+    displaySurfaceSelector.disabled = isDisabled;
+}
+
+function getUserVideoInputDevicesSelectorContainer(devices: MediaDeviceInfo[], selectedDeviceId?: string) {
+    const container = document.createElement('div');
+    container.className = 'user-video-input-devices-selector-container';
+    const selectorId = 'user-video-input-devices-selector';
     const label = document.createElement('label');
     label.textContent = 'Video Input Devices:';
     label.setAttribute('for', selectorId);
     container.appendChild(label);
 
     const deviceSelector = getDevicesSelector(selectorId, devices, async (deviceId: string) => {
-        await MediaManager.instance.setVideoInputDevice(deviceId, updateVideoElementsStream);
+        await MediaManager.instance.setVideoInputDevice(deviceId, updateUserVideoElementsStream);
     }, selectedDeviceId)
     container.appendChild(deviceSelector);
 
     return container;
 }
 
-function unregisterDeviceChangeEvents() {
+function unregisterUserDeviceChangeEvent() {
     if (deviceChangeCallbackId === null) return;
     MediaManager.instance.unregisterDeviceChange(deviceChangeCallbackId);
     deviceChangeCallbackId = null
 }
 
-function registerDeviceChangeEvents(forAudioElementOnly: boolean) {
+function registerUserDeviceChangeEvent(forAudioElementOnly: boolean) {
 
     // on device change 
     deviceChangeCallbackId = MediaManager.instance.registerDeviceChange(async () => {
         console.log('Device changed');
 
-
         // check if stream is close then we have to get the stream again
-        if (MediaManager.instance.mediaStream === null) {
+        if (MediaManager.instance.userStream === null) {
             console.info('Media stream is null, getting new stream');
             // get the stream again
             const stream = await MediaManager.instance.getUserMedia({ video: forAudioElementOnly ? false : true, audio: true });
 
-            const videoElement = document.querySelector<HTMLVideoElement>('video');
-            const audioElement = document.querySelector<HTMLAudioElement>('audio');
+            const videoElement = document.querySelector<HTMLVideoElement>('video#user-video');
+            const audioElement = document.querySelector<HTMLAudioElement>('audio#user-audio');
 
             if (audioElement && forAudioElementOnly) {
                 console.info('Updating audio stream to audio element');
@@ -265,64 +340,155 @@ function registerDeviceChangeEvents(forAudioElementOnly: boolean) {
         }
 
         const mediaContainer = document.querySelector<HTMLDivElement>('.media-container')!;
-        removeDeviceSelectors();
+        removeUserDeviceSelectors();
 
-        const audioInputDevices = MediaManager.instance.getAudioInputDevices();
-        const audioOutputDevices = MediaManager.instance.getAudioOutputDevices();
+        const audioInputDevices = MediaManager.instance.audioInputDevices;
+        const audioOutputDevices = MediaManager.instance.audioOutputDevices;
         const selectedAudioInputDeviceId = MediaManager.instance.currentAudioInputDeviceId;
 
-        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
-        mediaContainer.append(getAudioOutputDevicesSelectorContainer(audioOutputDevices));
+        mediaContainer.append(getUserAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
+        mediaContainer.append(getUserAudioOutputDevicesSelectorContainer(audioOutputDevices));
 
         if (!forAudioElementOnly) {
-            const videoInputDevices = MediaManager.instance.getVideoInputDevices();
+            const videoInputDevices = MediaManager.instance.videoInputDevices;
             const selectedVideoInputDeviceId = MediaManager.instance.currentVideoInputDeviceId;
 
-            mediaContainer.append(getVideoInputDevicesSelectorContainer(videoInputDevices, selectedVideoInputDeviceId));
+            mediaContainer.append(getUserVideoInputDevicesSelectorContainer(videoInputDevices, selectedVideoInputDeviceId));
         }
     });
 }
 
-function getLocalStreamVideoButton(): HTMLButtonElement {
-    return getButton(`Get local video stream`, 'local-stream-video-btn', async (e: Event) => {
+function unregisterDisplayStreamEndEvent() {
+    if (displayStreamEndCallbackId === null) return;
+    MediaManager.instance.unregisterDisplayStreamEnd(displayStreamEndCallbackId);
+    displayStreamEndCallbackId = null
+}
+
+function registerDisplayStreamEndEvent() {
+    if (MediaManager.instance.displayStream !== null) {
+        // on display stream end 
+        displayStreamEndCallbackId = MediaManager.instance.registerDisplayStreamEnd(async () => {
+            console.log('Display stream end');
+            stopLocalDisplayStream();
+        });
+    }
+}
+
+function getLocalUserStreamVideoButton(): HTMLButtonElement {
+    return getButton(`Get local user video stream`, 'local-user-stream-video-btn', async (e: Event) => {
         (e.target as HTMLButtonElement).disabled = true;
-        disableLocalStreamAudioButton();
-        enableLocalStreamButton();
-        enableToggleAudioButton();
-        enableToggleVideoButton();
-        const stream = await MediaManager.instance.getUserMedia({ video: true, audio: true });
+        disableLocalUserStreamAudioButton();
+        disableLocalDisplayStreamButton();
+
+        let stream: MediaStream;
+        try {
+            stream = await MediaManager.instance.getUserMedia({ video: true, audio: true });
+        } catch (err) {
+            (e.target as HTMLButtonElement).disabled = false;
+            enableLocalUserStreamAudioButton();
+            enableLocalDisplayStreamButton();
+
+            if (err.name === 'NotAllowedError') {
+                window.alert('User denied permission to share video');
+            } else {
+                window.alert('Failed to get video stream: ' + err);
+            }
+            return;
+        }
+
         const mediaContainer = document.querySelector<HTMLDivElement>('.media-container')!;
-        mediaContainer.appendChild(getVideoElement(stream));
+        mediaContainer.appendChild(getVideoElement(stream, 'user-video'));
+
         await MediaManager.instance.enumerateDevices();
-        const audioInputDevices = MediaManager.instance.getAudioInputDevices();
-        const audioOutputDevices = MediaManager.instance.getAudioOutputDevices();
-        const videoInputDevices = MediaManager.instance.getVideoInputDevices();
+        const audioInputDevices = MediaManager.instance.audioInputDevices;
+        const audioOutputDevices = MediaManager.instance.audioOutputDevices;
+        const videoInputDevices = MediaManager.instance.videoInputDevices;
         const selectedAudioInputDeviceId = MediaManager.instance.currentAudioInputDeviceId;
         const selectedVideoInputDeviceId = MediaManager.instance.currentVideoInputDeviceId;
-        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
-        mediaContainer.append(getAudioOutputDevicesSelectorContainer(audioOutputDevices));
-        mediaContainer.append(getVideoInputDevicesSelectorContainer(videoInputDevices, selectedVideoInputDeviceId));
-        registerDeviceChangeEvents(false);
+        mediaContainer.append(getUserAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
+        mediaContainer.append(getUserAudioOutputDevicesSelectorContainer(audioOutputDevices));
+        mediaContainer.append(getUserVideoInputDevicesSelectorContainer(videoInputDevices, selectedVideoInputDeviceId));
 
+        registerUserDeviceChangeEvent(false);
+        enableStopLocalUserStreamButton();
+        enableToggleUserAudioButton();
+        enableToggleUserVideoButton();
     });
 }
 
-function getLocalStreamAudioButton(): HTMLButtonElement {
-    return getButton(`Get local audio stream`, 'local-stream-audio-btn', async (e: Event) => {
+function getLocalUserStreamAudioButton(): HTMLButtonElement {
+    return getButton(`Get local user audio stream`, 'local-user-stream-audio-btn', async (e: Event) => {
         (e.target as HTMLButtonElement).disabled = true;
-        disableLocalStreamVideoButton();
-        enableLocalStreamButton();
-        enableToggleAudioButton();
-        const stream = await MediaManager.instance.getUserMedia({ audio: true });
+        disableLocalUserStreamVideoButton();
+        disableLocalDisplayStreamButton();
+
+        let stream: MediaStream;
+        try {
+            stream = await MediaManager.instance.getUserMedia({ audio: true });
+        } catch (err) {
+            (e.target as HTMLButtonElement).disabled = false;
+            enableLocalUserStreamVideoButton();
+            enableLocalDisplayStreamButton();
+
+            if (err.name === 'NotAllowedError') {
+                window.alert('User denied permission to share audio');
+            } else {
+                window.alert('Failed to get audio stream: ' + err);
+            }
+            return;
+        }
+
         const mediaContainer = document.querySelector<HTMLDivElement>('.media-container')!;
-        mediaContainer.appendChild(getAudioElement(stream));
+        mediaContainer.appendChild(getAudioElement(stream, 'user-audio'));
+
         await MediaManager.instance.enumerateDevices();
-        const audioInputDevices = MediaManager.instance.getAudioInputDevices();
-        const audioOutputDevices = MediaManager.instance.getAudioOutputDevices();
+        const audioInputDevices = MediaManager.instance.audioInputDevices;
+        const audioOutputDevices = MediaManager.instance.audioOutputDevices;
         const selectedAudioInputDeviceId = MediaManager.instance.currentAudioInputDeviceId;
-        mediaContainer.append(getAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
-        mediaContainer.append(getAudioOutputDevicesSelectorContainer(audioOutputDevices));
-        registerDeviceChangeEvents(true);
+        mediaContainer.append(getUserAudioInputDevicesSelectorContainer(audioInputDevices, selectedAudioInputDeviceId));
+        mediaContainer.append(getUserAudioOutputDevicesSelectorContainer(audioOutputDevices));
+
+        registerUserDeviceChangeEvent(true);
+        enableStopLocalUserStreamButton();
+        enableToggleUserAudioButton();
+    });
+}
+
+function getLocalDisplayStreamButton(): HTMLButtonElement {
+    return getButton(`Get local display stream`, 'local-display-stream-btn', async (e: Event) => {
+        (e.target as HTMLButtonElement).disabled = true;
+        disableLocalUserStreamVideoButton();
+        disableLocalUserStreamAudioButton();
+        toggleDisplaySurfaceSelectorDisabled(true);
+
+        const options = { video: true, audio: true };
+        const displaySurface = getDisplaySurfaceSelectorValue();
+        if (displaySurface !== '') {
+            options.video = { displaySurface };
+        }
+
+        let stream: MediaStream;
+        try {
+            stream = await MediaManager.instance.getDisplayMedia(options);
+        } catch (err) {
+            (e.target as HTMLButtonElement).disabled = false;
+            enableLocalUserStreamVideoButton();
+            enableLocalUserStreamAudioButton();
+            toggleDisplaySurfaceSelectorDisabled(false);
+
+            if (err.name === 'NotAllowedError') {
+                window.alert('User denied permission to share display');
+            } else {
+                window.alert('Failed to get display stream: ' + err);
+            }
+            return;
+        }
+
+        const mediaContainer = document.querySelector<HTMLDivElement>('.media-container')!;
+        mediaContainer.appendChild(getVideoElement(stream, 'display-video'));
+
+        registerDisplayStreamEndEvent();
+        enableStopLocalDisplayStreamButton();
     });
 }
 
@@ -334,11 +500,15 @@ export function getMediaContainer() {
     heading.innerText = 'Media Demo';
     container.appendChild(heading);
 
-    container.appendChild(getLocalStreamVideoButton());
-    container.appendChild(getLocalStreamAudioButton());
-    container.appendChild(stopLocalStreamButton());
-    container.appendChild(toggleAudioButton());
-    container.appendChild(toggleVideoButton());
+    container.appendChild(getLocalUserStreamVideoButton());
+    container.appendChild(getLocalUserStreamAudioButton());
+    container.appendChild(stopLocalUserStreamButton());
+    container.appendChild(toggleUserAudioButton());
+    container.appendChild(toggleUserVideoButton());
+
+    container.appendChild(getLocalDisplayStreamButton());
+    container.appendChild(stopLocalDisplayStreamButton());
+    container.appendChild(getDisplaySurfaceSelectorContainer());
 
     return container;
 }
